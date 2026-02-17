@@ -1,0 +1,31 @@
+filebeat.inputs:
+  - type: filestream
+    id: docker-containers
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+
+processors:
+  # Parse le JSON si tes logs applicatifs sont en JSON dans "message"
+  - decode_json_fields:
+      fields: ["message"]
+      target: ""
+      overwrite_keys: true
+      add_error_key: true
+
+  # Ajoute les métadonnées Docker (container.name, image, labels, etc.)
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+
+  - add_tags:
+      tags: ["medassist"]
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "medassist-logs-%{+yyyy.MM.dd}"
+
+setup.template.enabled: true
+setup.template.name: "medassist-logs"
+setup.template.pattern: "medassist-logs-*"
+
+logging.level: info
