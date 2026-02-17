@@ -173,6 +173,83 @@ services:
         done
     restart: unless-stopped
 
+  # -------------------------------------------------------------------------
+  # Prometheus
+  # -------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: medassist-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    networks:
+      - medassist-network
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # Grafana
+  # -------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: medassist-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - medassist-network
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # cAdvisor (métriques conteneurs Docker)
+  # -------------------------------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: medassist-cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    networks:
+      - medassist-network
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # Node Exporter (métriques OS hôte)
+  # -------------------------------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: medassist-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+    networks:
+      - medassist-network
+    restart: unless-stopped
+
+
 # ---------------------------------------------------------------------------
 # Networks
 # ---------------------------------------------------------------------------
@@ -189,3 +266,7 @@ volumes:
     name: medassist-mysql-data
   redis_data:
     name: medassist-redis-data
+  prometheus_data:
+    name: medassist-prometheus-data
+  grafana_data:
+    name: medassist-grafana-data
