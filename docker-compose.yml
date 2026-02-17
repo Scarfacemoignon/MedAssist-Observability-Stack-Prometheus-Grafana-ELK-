@@ -1,0 +1,191 @@
+###############################################################################
+# MedAssist - Stack applicative de base
+# Etude de cas : Monitoring de l'infrastructure
+# Plateforme de teleconsultation medicale
+#
+# Usage:
+#   docker compose up -d
+#   docker compose ps
+#   curl http://localhost:5000/health
+#
+# Les etudiants devront ajouter les services de monitoring
+# (Prometheus, Grafana, ELK, etc.) a ce fichier.
+###############################################################################
+
+services:
+  # -------------------------------------------------------------------------
+  # Frontend - Nginx serving static files + reverse proxy
+  # -------------------------------------------------------------------------
+  frontend:
+    image: nginx:1.25-alpine
+    container_name: medassist-frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/index.html:/usr/share/nginx/html/index.html:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - medassist-network
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # Backend API - Flask application with Prometheus metrics
+  # -------------------------------------------------------------------------
+  api:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: medassist-api
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=medassist
+      - MYSQL_DATABASE=medassist
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - medassist-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "medassist-api"
+
+  # -------------------------------------------------------------------------
+  # MySQL Database
+  # -------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: medassist-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: medassist
+      MYSQL_DATABASE: medassist
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - medassist-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pmedassist"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "medassist-mysql"
+
+  # -------------------------------------------------------------------------
+  # Redis Cache
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: medassist-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - medassist-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "medassist-redis"
+
+  # -------------------------------------------------------------------------
+  # Traffic generator - Simulates patient activity for realistic metrics
+  # -------------------------------------------------------------------------
+  traffic-generator:
+    image: curlimages/curl:latest
+    container_name: medassist-traffic
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - medassist-network
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "Starting traffic generator..."
+        sleep 10
+        while true; do
+          # Health check
+          curl -s http://api:5000/health > /dev/null 2>&1
+          sleep 1
+
+          # Browse doctors
+          curl -s http://api:5000/api/doctors > /dev/null 2>&1
+          sleep 2
+
+          # Get consultations
+          curl -s http://api:5000/api/consultations > /dev/null 2>&1
+          sleep 1
+
+          # Book a consultation
+          curl -s -X POST http://api:5000/api/consultations \
+            -H "Content-Type: application/json" \
+            -d "{\"patient_id\": $$(( RANDOM % 10 + 1 )), \"doctor_id\": $$(( RANDOM % 9 + 1 )), \"type\": \"general\"}" \
+            > /dev/null 2>&1
+          sleep 2
+
+          # Process payment (has ~5% error rate)
+          curl -s -X POST http://api:5000/api/payment > /dev/null 2>&1
+          sleep 1
+
+          # Additional doctor browsing
+          curl -s http://api:5000/api/doctors > /dev/null 2>&1
+          sleep 3
+        done
+    restart: unless-stopped
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  medassist-network:
+    driver: bridge
+    name: medassist-network
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  mysql_data:
+    name: medassist-mysql-data
+  redis_data:
+    name: medassist-redis-data

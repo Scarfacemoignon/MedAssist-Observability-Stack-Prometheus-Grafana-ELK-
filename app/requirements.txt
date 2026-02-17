@@ -1,0 +1,5 @@
+flask==3.0.0
+prometheus_client==0.21.0
+mysql-connector-python==8.2.0
+redis==5.0.1
+gunicorn==21.2.0
