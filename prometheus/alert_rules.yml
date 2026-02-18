@@ -1,0 +1,29 @@
+groups:
+  - name: medassist-backups
+    rules:
+      - alert: MySQLBackupFailed
+        expr: backup_status{job="mysql_backup"} == 1
+        for: 1m
+        labels:
+          severity: P1
+        annotations:
+          summary: "MySQL backup failed"
+          description: "Backup script reported failure (backup_status=1)."
+
+      - alert: MySQLBackupRPOExceeded
+        expr: (time() - backup_last_success_timestamp{job="mysql_backup"}) > 1800
+        for: 2m
+        labels:
+          severity: P1
+        annotations:
+          summary: "MySQL backup RPO exceeded (>30min)"
+          description: "Last successful backup older than 30 minutes."
+
+      - alert: MySQLBackupSizeAnomaly
+        expr: backup_size_bytes{job="mysql_backup"} < 10000
+        for: 2m
+        labels:
+          severity: P2
+        annotations:
+          summary: "MySQL backup size anomaly"
+          description: "Backup size unexpectedly small (<10KB)."
