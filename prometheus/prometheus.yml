@@ -27,3 +27,8 @@ scrape_configs:
     honor_labels: true
     static_configs:
       - targets: ["pushgateway:9091"]
+      
+  #haproxy    
+  - job_name: "haproxy"
+    static_configs:
+      - targets: ["haproxy-exporter:9101"]

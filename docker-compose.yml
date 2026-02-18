@@ -8,7 +8,6 @@
 #   docker compose ps
 #   curl http://localhost:5000/health
 #
-# Les etudiants devront ajouter les services de monitoring
 # (Prometheus, Grafana, ELK, etc.) a ce fichier.
 ###############################################################################
 
@@ -316,12 +315,39 @@ services:
     networks:
       - medassist-network
     restart: unless-stopped
+  # -------------------------------------------------------------------------
+  # haproxy
+  # -------------------------------------------------------------------------    
+  haproxy:
+    image: haproxy:2.9
+    container_name: medassist-haproxy
+    ports:
+      - "8088:8088"
+      - "8404:8404"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - api
+    networks:
+      - medassist-network
+    restart: unless-stopped
 
+  haproxy-exporter:
+    image: prom/haproxy-exporter:latest
+    container_name: medassist-haproxy-exporter
+    command:
+      - "--haproxy.scrape-uri=http://admin:admin@haproxy:8404/stats;csv"
+    ports:
+      - "9101:9101"
+    depends_on:
+      - haproxy
+    networks:
+      - medassist-network
+    restart: unless-stopped
 
-
-# ---------------------------------------------------------------------------
-# Networks
-# ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # Networks
+  # ---------------------------------------------------------------------------
 networks:
   medassist-network:
     driver: bridge
