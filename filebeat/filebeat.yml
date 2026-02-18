@@ -1,7 +1,11 @@
 filebeat.inputs:
-  - type: container
+  - type: filestream
+    id: docker-logs
     paths:
-      - /var/lib/docker/containers/*/*.log
+      - /var/lib/docker/containers/*/*-json.log
+    parsers:
+      - container:
+          stream: all
     processors:
       - add_docker_metadata: ~
       - decode_json_fields:
