@@ -303,6 +303,19 @@ services:
       - medassist-network
     restart: unless-stopped
 
+  # -------------------------------------------------------------------------
+  # pushgateway
+  # -------------------------------------------------------------------------
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: medassist-pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - medassist-network
+    restart: unless-stopped
+
+
 
 # ---------------------------------------------------------------------------
 # Networks
