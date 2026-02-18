@@ -1,0 +1,5 @@
+server.host: "0.0.0.0"
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+
+# Requis pour Alerting (>= 32 caractères)
+xpack.encryptedSavedObjects.encryptionKey: "9f3b7a4e8c2f1d5a6b7c9e0f123456789abcdef0123456789abcdef01234567"
