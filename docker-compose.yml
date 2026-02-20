@@ -37,7 +37,7 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
-    container_name: medassist-api
+    #container_name: medassist-api
     environment:
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
@@ -46,8 +46,8 @@ services:
       - MYSQL_DATABASE=medassist
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    ports:
-      - "5000:5000"
+    #ports:
+    #  - "5000:5000"
     depends_on:
       mysql:
         condition: service_healthy
@@ -341,6 +341,20 @@ services:
       - "9101:9101"
     depends_on:
       - haproxy
+    networks:
+      - medassist-network
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # Alertmanager
+  # -------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: medassist-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     networks:
       - medassist-network
     restart: unless-stopped

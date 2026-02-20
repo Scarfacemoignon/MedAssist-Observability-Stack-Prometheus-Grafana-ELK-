@@ -1,0 +1,39 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "p4-receiver"
+  group_by: ["alertname"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 30m
+
+  routes:
+    - match:
+        severity: P1
+      receiver: "p1-receiver"
+
+    - match:
+        severity: P2
+      receiver: "p2-receiver"
+
+    - match:
+        severity: P3
+      receiver: "p3-receiver"
+
+receivers:
+  - name: "p1-receiver"
+    webhook_configs:
+      - url: "http://api:5000/api/webhook/alert"
+
+  - name: "p2-receiver"
+    webhook_configs:
+      - url: "http://api:5000/api/webhook/alert"
+
+  - name: "p3-receiver"
+    webhook_configs:
+      - url: "http://api:5000/api/webhook/alert"
+
+  - name: "p4-receiver"
+    webhook_configs:
+      - url: "http://api:5000/api/webhook/alert"

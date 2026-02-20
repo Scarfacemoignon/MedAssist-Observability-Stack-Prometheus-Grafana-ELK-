@@ -1,6 +1,7 @@
 groups:
   - name: medassist-backups
     rules:
+      # P1 - Critique
       - alert: MySQLBackupFailed
         expr: backup_status{job="mysql_backup"} == 1
         for: 1m
@@ -19,6 +20,7 @@ groups:
           summary: "MySQL backup RPO exceeded (>30min)"
           description: "Last successful backup older than 30 minutes."
 
+      # P2 - Majeur
       - alert: MySQLBackupSizeAnomaly
         expr: backup_size_bytes{job="mysql_backup"} < 10000
         for: 2m
@@ -27,3 +29,55 @@ groups:
         annotations:
           summary: "MySQL backup size anomaly"
           description: "Backup size unexpectedly small (<10KB)."
+
+  - name: medassist-api-infra
+    rules:
+      # P1 - Critique
+      - alert: APIDown
+        expr: sum(haproxy_server_up{backend="api_backend"}) == 0
+        for: 1m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Indisponibilité totale de l'API"
+          description: "Plus aucune instance de l'API n'est active derrière HAProxy. Les téléconsultations sont bloquées."
+
+      # P2 - Majeur
+      - alert: HighPaymentErrorRate
+        # Déclenche si plus de 3% d'erreurs 5xx sur l'endpoint de paiement
+        expr: sum(rate(flask_http_request_duration_seconds_count{status=~"5..", path="/api/payment"}[1m])) / sum(rate(flask_http_request_duration_seconds_count{path="/api/payment"}[1m])) > 0.03
+        for: 2m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Taux d'erreur élevé sur les paiements"
+          description: "Le taux d'erreur du service de paiement dépasse les 3%. Des consultations ne sont pas facturées."
+
+      # P3 - Mineur
+      - alert: PartialAPIOutage
+        expr: sum(haproxy_server_up{backend="api_backend"}) < 3 and sum(haproxy_server_up{backend="api_backend"}) > 0
+        for: 2m
+        labels:
+          severity: P3
+        annotations:
+          summary: "Panne partielle de l'API (Dégradation HA)"
+          description: "Au moins un replica de l'API est tombé. Le service reste disponible mais avec une redondance réduite."
+
+      # P4 - Informatif
+      - alert: HighHostCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: P4
+        annotations:
+          summary: "Utilisation CPU élevée sur l'hôte"
+          description: "Le CPU de la machine hôte dépasse 80% depuis 5 minutes."
+
+      - alert: HighMemoryUsageContainer
+        expr: container_memory_usage_bytes{name=~"medassist-.*"} / container_spec_memory_limit_bytes > 0.85
+        for: 5m
+        labels:
+          severity: P4
+        annotations:
+          summary: "Utilisation Mémoire élevée (Conteneur)"
+          description: "Le conteneur {{ $labels.name }} consomme plus de 85% de sa mémoire allouée."
